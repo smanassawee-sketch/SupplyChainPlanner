@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIM ALLOCATOR - Enterprise Inventory AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Sarabun', sans-serif; height: 100vh; overflow: hidden; background-color: #f3f4f6; }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .nav-active { background-color: #1d4ed8 !important; color: white !important; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3); }
+        .stat-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid rgba(0,0,0,0.05); }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .dropdown-content { display: none; position: absolute; background-color: white; min-width: 100%; max-height: 400px; overflow-y: auto; box-shadow: 0px 20px 40px rgba(0,0,0,0.15); z-index: 100; border-radius: 20px; border: 1px solid #e5e7eb; margin-top: 10px; }
+        .dropdown-content.show { display: block; animation: slideDown 0.2s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .selected-tag { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #1e40af; border: 1px solid #bfdbfe; padding: 6px 12px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+        .status-badge { padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .alert-table thead th { position: sticky; top: 0; background: #f8fafc; z-index: 10; border-bottom: 2px solid #e2e8f0; }
+    </style>
+</head>
+<body class="flex">
+
+    <!-- SIDEBAR -->
+    <aside class="w-72 bg-[#0F172A] text-slate-400 flex flex-col shadow-2xl z-30">
+        <div class="p-8 flex items-center gap-4">
+            <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/50">
+                <i class="fa-solid fa-microchip text-white text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-white font-black text-lg tracking-tight leading-none">AIM ALLOCATOR</h1>
+                <p class="text-[10px] text-blue-400 font-bold uppercase tracking-widest mt-1">Enterprise AI v2.5</p>
+            </div>
+        </div>
+        
+        <nav class="flex-1 px-6 space-y-2 mt-4">
+            <div class="text-[10px] font-black text-slate-500 mb-4 px-4 uppercase tracking-[2px]">Operations</div>
+            <button onclick="switchView('dashboard')" id="nav-dashboard" class="w-full flex items-center px-4 py-4 rounded-2xl hover:bg-slate-800 transition-all text-sm nav-active">
+                <i class="fa-solid fa-grid-2 w-8 text-lg"></i> Dashboard ภาพรวม
+            </button>
+            <button onclick="switchView('allocation')" id="nav-allocation" class="w-full flex items-center px-4 py-4 rounded-2xl hover:bg-slate-800 transition-all text-sm">
+                <i class="fa-solid fa-route w-8 text-lg"></i> แผนจัดสรรสินค้า
+            </button>
+            <div class="h-8"></div>
+            <div class="text-[10px] font-black text-slate-500 mb-4 px-4 uppercase tracking-[2px]">Data Assets</div>
+            <button class="w-full flex items-center px-4 py-4 rounded-2xl hover:bg-slate-800 transition-all text-sm">
+                <i class="fa-solid fa-boxes-stacked w-8 text-lg"></i> Master Products
+            </button>
+            <button class="w-full flex items-center px-4 py-4 rounded-2xl hover:bg-slate-800 transition-all text-sm">
+                <i class="fa-solid fa-industry w-8 text-lg"></i> Warehouse Locations
+            </button>
+        </nav>
+
+        <div class="p-6 border-t border-slate-800">
+            <div class="bg-slate-800/50 rounded-2xl p-4">
+                <p class="text-[10px] font-bold text-slate-500 uppercase">Current Model</p>
+                <p class="text-xs text-white font-bold">GPT-Inventory-Optimizer</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
+        <header class="h-20 bg-white border-b border-slate-200 flex justify-between items-center px-10 flex-none z-20">
+            <div>
+                <h2 id="view-title" class="text-xl font-black text-slate-800 uppercase tracking-tight">Executive Intelligence</h2>
+                <p class="text-[11px] text-slate-400 font-bold">สรุปสถานะสต็อกสินค้าและแผนการจัดส่งทั่วประเทศ</p>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="text-right">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase">Last Sync</p>
+                    <p class="text-xs font-black text-slate-700">Today, 14:20 PM</p>
+                </div>
+                <div class="h-10 w-[1px] bg-slate-200"></div>
+                <button class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-blue-600 hover:text-white transition-all">
+                    <i class="fa-solid fa-bell"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+            <!-- INTELLIGENT FILTERS -->
+            <section class="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                    <div class="space-y-3">
+                        <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <i class="fa-solid fa-location-dot text-blue-500"></i> Location
+                        </label>
+                        <select id="f-factory" onchange="updateUI()" class="w-full bg-slate-50 border-none rounded-2xl text-sm p-4 focus:ring-2 focus:ring-blue-500 font-bold text-slate-700">
+                            <option value="All">ทุกโรงงาน</option>
+                        </select>
+                    </div>
+                    <div class="space-y-3">
+                        <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <i class="fa-solid fa-truck-field text-blue-500"></i> Vendor
+                        </label>
+                        <select id="f-vendor" onchange="updateUI()" class="w-full bg-slate-50 border-none rounded-2xl text-sm p-4 focus:ring-2 focus:ring-blue-500 font-bold text-slate-700">
+                            <option value="All">ทุกผู้ขาย</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2 space-y-3 relative">
+                        <label class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass text-blue-500"></i> Search Product
+                        </label>
+                        <div class="relative" id="productDropdownContainer">
+                            <input type="text" id="productSearchInput" onfocus="showDropdown()" oninput="filterDropdown()" placeholder="เลือกสินค้าเพื่อกรองข้อมูล..." class="w-full bg-slate-50 border-none rounded-2xl text-sm pl-6 p-4 focus:ring-2 focus:ring-blue-500 font-bold text-slate-700">
+                            <div id="productDropdown" class="dropdown-content custom-scrollbar"></div>
+                        </div>
+                        <div id="selectedProducts" class="flex flex-wrap gap-2 mt-3"></div>
+                    </div>
+                    <div class="flex items-end pb-1">
+                        <button onclick="clearFilters()" class="w-full bg-slate-900 hover:bg-blue-700 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-slate-200 text-xs uppercase tracking-widest">
+                            <i class="fa-solid fa-rotate-right mr-2"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 1: DASHBOARD -->
+            <div id="view-dashboard" class="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div class="bg-white p-8 rounded-[2.5rem] stat-card border-l-8 border-l-red-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Critical DOH</p>
+                        <h3 id="stat-critical" class="text-4xl font-black text-slate-800">0</h3>
+                        <p class="text-[11px] text-red-500 font-bold mt-2"><i class="fa-solid fa-arrow-down mr-1"></i> Below 7 Days</p>
+                    </div>
+                    <div class="bg-white p-8 rounded-[2.5rem] stat-card border-l-8 border-l-orange-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Warning DOH</p>
+                        <h3 id="stat-warning" class="text-4xl font-black text-slate-800">0</h3>
+                        <p class="text-[11px] text-orange-500 font-bold mt-2"><i class="fa-solid fa-clock mr-1"></i> 7-14 Days</p>
+                    </div>
+                    <div class="bg-white p-8 rounded-[2.5rem] stat-card border-l-8 border-l-emerald-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Healthy Stock</p>
+                        <h3 id="stat-healthy" class="text-4xl font-black text-slate-800">0</h3>
+                        <p class="text-[11px] text-emerald-500 font-bold mt-2"><i class="fa-solid fa-check-circle mr-1"></i> Above 14 Days</p>
+                    </div>
+                    <div class="bg-white p-8 rounded-[2.5rem] stat-card border-l-8 border-l-blue-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Locations</p>
+                        <h3 id="stat-total" class="text-4xl font-black text-slate-800">0</h3>
+                        <p class="text-[11px] text-blue-500 font-bold mt-2"><i class="fa-solid fa-industry mr-1"></i> Reported</p>
+                    </div>
+                </div>
+
+                <!-- ALERT PANELS -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden flex flex-col">
+                        <div class="p-6 bg-red-50 border-b border-red-100 flex justify-between items-center">
+                            <h5 class="text-sm font-black text-red-700 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fa-solid fa-triangle-exclamation text-red-600"></i> Critical Status (< 7 Days)
+                            </h5>
+                            <span id="count-critical" class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">0</span>
+                        </div>
+                        <div class="flex-1 max-h-[450px] overflow-y-auto custom-scrollbar">
+                            <table class="w-full text-left alert-table">
+                                <thead class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                    <tr>
+                                        <th class="px-6 py-4">สินค้า</th>
+                                        <th class="px-4 py-4">โรงงาน</th>
+                                        <th class="px-4 py-4 text-right">สต็อก</th>
+                                        <th class="px-6 py-4 text-center">DOH</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="critical-table-body" class="text-[11px] font-bold text-slate-600 divide-y divide-slate-50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden flex flex-col">
+                        <div class="p-6 bg-orange-50 border-b border-orange-100 flex justify-between items-center">
+                            <h5 class="text-sm font-black text-orange-700 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fa-solid fa-clock text-orange-600"></i> Warning Status (7-14 Days)
+                            </h5>
+                            <span id="count-warning" class="bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">0</span>
+                        </div>
+                        <div class="flex-1 max-h-[450px] overflow-y-auto custom-scrollbar">
+                            <table class="w-full text-left alert-table">
+                                <thead class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                    <tr>
+                                        <th class="px-6 py-4">สินค้า</th>
+                                        <th class="px-4 py-4">โรงงาน</th>
+                                        <th class="px-4 py-4 text-right">สต็อก</th>
+                                        <th class="px-6 py-4 text-center">DOH</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="warning-table-body" class="text-[11px] font-bold text-slate-600 divide-y divide-slate-50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-10 rounded-[3rem] shadow-xl shadow-slate-200/30 border border-slate-100">
+                    <div class="flex justify-between items-start mb-8">
+                        <div>
+                            <h4 class="text-lg font-black text-slate-800">Top 10 Lowest DOH (Avg. Product Level)</h4>
+                            <p class="text-xs text-slate-400 font-bold">ค่าเฉลี่ย DOH รายสินค้าจากโรงงานที่เลือก</p>
+                        </div>
+                    </div>
+                    <div class="h-[400px]">
+                        <canvas id="lowDohChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: ALLOCATION TABLE -->
+            <div id="view-allocation" class="hidden animate-in fade-in slide-in-from-bottom-4">
+                <div class="bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+                    <div class="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h4 class="font-black text-slate-800 uppercase tracking-widest text-sm">Inventory Allocation Matrix</h4>
+                        <div class="flex gap-2">
+                             <span class="status-badge bg-red-100 text-red-600">Critical</span>
+                             <span class="status-badge bg-orange-100 text-orange-600">Warning</span>
+                             <span class="status-badge bg-emerald-100 text-emerald-600">Healthy</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left whitespace-nowrap">
+                            <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[2px] border-b border-slate-100">
+                                <tr>
+                                    <th class="px-8 py-6">Factory</th>
+                                    <th class="px-6 py-6">Product Details</th>
+                                    <th class="px-6 py-6 text-right">Inventory</th>
+                                    <th class="px-6 py-6 text-right">Avg Usage</th>
+                                    <th class="px-6 py-6 text-center">DOH</th>
+                                    <th class="px-6 py-6 text-right bg-blue-50/50 text-blue-700">AI Suggest (L/Kg)</th>
+                                    <th class="px-8 py-6 bg-blue-50/50 text-blue-700">Action Plan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-600"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Master Data with Main Group & Common Name added
+        const masterProducts = [
+            { name: "BETAFIN LQD 38%", packing: "ISO", vendor: "Danisco", group: "Betaine", common: "Betaine Liquid" },
+            { name: "BETAFIN LQD 38%", packing: "Flexi", vendor: "Danisco", group: "Betaine", common: "Betaine Liquid" },
+            { name: "VISTABET LIQUID 32%", packing: "Flexi", vendor: "AB Vista", group: "Betaine", common: "Betaine Liquid" },
+            { name: "VISTABET LIQUID 32%", packing: "IBC", vendor: "Varluaid", group: "Betaine", common: "Betaine Liquid" },
+            { name: "TNIBETAIN LIQUID IP", packing: "ISO", vendor: "Trouw", group: "Betaine", common: "Betaine Liquid" },
+            { name: "MYCO CURB LIQUID", packing: "Flexi", vendor: "Kemin", group: "ANTIMOLD", common: "Antimold" },
+            { name: "MYCO CURB LIQUID", packing: "IBC", vendor: "Kemin", group: "ANTIMOLD", common: "Antimold" },
+            { name: "AXTRA PRIME 501 T", packing: "SBO", vendor: "Danisco", group: "ENZYMES", common: "MULTI NSP POWDER" },
+            { name: "PORZYME TP100 (HP)", packing: "SBO", vendor: "Danisco", group: "ENZYMES", common: "MULTI NSP POWDER" },
+            { name: "ENVIVA PRO 202 GT", packing: "SBO", vendor: "Danisco", group: "PROBIOTICS", common: "ENVIVA PRO" },
+            { name: "ACID LAC DRY", packing: "SBO", vendor: "Kemin", group: "ACIDIFIERS", common: "ACIDIFIER POWDER" },
+            { name: "EUROACID LIFEX 190", packing: "FLX", vendor: "Eurotec", group: "ACIDIFIERS", common: "ACIDIFIER LIQUID" },
+            { name: "EUROACID LIFEX 190", packing: "IBC", vendor: "Eurotec", group: "ACIDIFIERS", common: "ACIDIFIER LIQUID" },
+            { name: "PRESERVE-M", packing: "DMO", vendor: "Internovation", group: "ANTIMOLD", common: "Antimold" },
+            { name: "PRESERVE-M", packing: "IBC", vendor: "Internovation", group: "ANTIMOLD", common: "Antimold" },
+            { name: "BREDOL 683", packing: "IBC", vendor: "Eurotec", group: "EMULSIFIERS", common: "Emulsifier" }
+        ];
+
+        const locations = ["บางนา กม.21", "โคราช", "ขอนแก่น", "หนองแค", "โคกตูม", "ศรีราชา", "ลำพูน", "ศรีสะเกษ", "ราชบุรี", "พิษณุโลก", "กบินทร์บุรี"];
+
+        let inventoryData = [];
+        let idCounter = 1;
+
+        // Generate Mock Data
+        locations.forEach(loc => {
+            masterProducts.forEach(prod => {
+                if (Math.random() > 0.3) {
+                    let stock = Math.random() * 8000 + 500;
+                    let usage = Math.random() * 400 + 20;
+                    inventoryData.push({
+                        id: idCounter++,
+                        ...prod,
+                        factory: loc,
+                        stock: Math.floor(stock),
+                        usage: Math.floor(usage)
+                    });
+                }
+            });
+        });
+
+        let selectedProducts = [];
+        let currentView = 'dashboard';
+        let lowDohChart = null;
+
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('view-dashboard').classList.toggle('hidden', view !== 'dashboard');
+            document.getElementById('view-allocation').classList.toggle('hidden', view !== 'allocation');
+            document.getElementById('nav-dashboard').classList.toggle('nav-active', view === 'dashboard');
+            document.getElementById('nav-allocation').classList.toggle('nav-active', view === 'allocation');
+            updateUI();
+        }
+
+        function populateUIElements() {
+            const factorySelect = document.getElementById('f-factory');
+            locations.sort().forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f; opt.innerText = f;
+                factorySelect.appendChild(opt);
+            });
+
+            const vendorSelect = document.getElementById('f-vendor');
+            const uniqueVendors = [...new Set(masterProducts.map(p => p.vendor))].sort();
+            uniqueVendors.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v; opt.innerText = v;
+                vendorSelect.appendChild(opt);
+            });
+        }
+
+        // --- PRODUCT FILTER DROPDOWN LOGIC ---
+        function showDropdown() { 
+            document.getElementById('productDropdown').classList.add('show'); 
+            filterDropdown(); 
+        }
+
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('productDropdownContainer');
+            if (container && !container.contains(e.target)) {
+                document.getElementById('productDropdown').classList.remove('show');
+            }
+        });
+
+        function filterDropdown() {
+            const query = document.getElementById('productSearchInput').value.toLowerCase();
+            // Get unique products by name to avoid duplicates in list
+            const uniqueProductInfo = [];
+            const map = new Map();
+            for (const item of masterProducts) {
+                if(!map.has(item.name)){
+                    map.set(item.name, true);
+                    uniqueProductInfo.push({
+                        name: item.name,
+                        group: item.group,
+                        common: item.common
+                    });
+                }
+            }
+
+            const filtered = uniqueProductInfo.filter(p => 
+                p.name.toLowerCase().includes(query) || 
+                p.group.toLowerCase().includes(query) || 
+                p.common.toLowerCase().includes(query)
+            );
+
+            const dropdown = document.getElementById('productDropdown');
+            dropdown.innerHTML = '';
+            
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">ไม่พบสินค้าที่ค้นหา</div>';
+                return;
+            }
+
+            filtered.forEach(prod => {
+                const isChecked = selectedProducts.includes(prod.name);
+                const div = document.createElement('div');
+                div.className = "px-6 py-4 hover:bg-blue-50 cursor-pointer flex items-center justify-between border-b border-slate-50 last:border-0 transition-colors";
+                div.innerHTML = `
+                    <div>
+                        <div class="text-sm font-black text-slate-700">${prod.name}</div>
+                        <div class="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">
+                            ${prod.group} • ${prod.common}
+                        </div>
+                    </div>
+                    <div class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-blue-600 border-blue-600' : 'border-slate-200'}">
+                        ${isChecked ? '<i class="fa-solid fa-check text-[10px] text-white"></i>' : ''}
+                    </div>
+                `;
+                div.onclick = () => toggleProduct(prod.name);
+                dropdown.appendChild(div);
+            });
+        }
+
+        function toggleProduct(name) {
+            if (selectedProducts.includes(name)) {
+                selectedProducts = selectedProducts.filter(p => p !== name);
+            } else {
+                selectedProducts.push(name);
+            }
+            renderTags();
+            filterDropdown();
+            updateUI();
+        }
+
+        function renderTags() {
+            const container = document.getElementById('selectedProducts');
+            container.innerHTML = '';
+            selectedProducts.forEach(p => {
+                const span = document.createElement('span');
+                span.className = "selected-tag shadow-sm animate-in zoom-in-95";
+                span.innerHTML = `${p} <i class="fa-solid fa-xmark cursor-pointer opacity-50 hover:opacity-100 ml-1" onclick="removeProduct('${p}')"></i>`;
+                container.appendChild(span);
+            });
+        }
+
+        function removeProduct(name) {
+            selectedProducts = selectedProducts.filter(p => p !== name);
+            renderTags();
+            updateUI();
+        }
+
+        function clearFilters() {
+            selectedProducts = [];
+            document.getElementById('f-factory').value = 'All';
+            document.getElementById('f-vendor').value = 'All';
+            document.getElementById('productSearchInput').value = '';
+            renderTags();
+            updateUI();
+        }
+
+        function updateUI() {
+            const factory = document.getElementById('f-factory').value;
+            const vendor = document.getElementById('f-vendor').value;
+            
+            const filtered = inventoryData.filter(i => {
+                const matchFactory = (factory === 'All' || i.factory === factory);
+                const matchVendor = (vendor === 'All' || i.vendor === vendor);
+                const matchProduct = (selectedProducts.length === 0 || selectedProducts.includes(i.name));
+                return matchFactory && matchVendor && matchProduct;
+            });
+
+            const processed = filtered.map(i => ({ ...i, doh: i.usage > 0 ? (i.stock / i.usage) : 999 }));
+
+            const criticalItems = processed.filter(i => i.doh < 7);
+            const warningItems = processed.filter(i => i.doh >= 7 && i.doh <= 14);
+
+            document.getElementById('stat-critical').innerText = criticalItems.length;
+            document.getElementById('stat-warning').innerText = warningItems.length;
+            document.getElementById('stat-healthy').innerText = processed.filter(i => i.doh > 14).length;
+            document.getElementById('stat-total').innerText = [...new Set(filtered.map(f => f.factory))].length;
+
+            if (currentView === 'dashboard') {
+                renderChart(processed);
+                renderAlertTables(criticalItems, warningItems);
+            } else {
+                renderTable(processed);
+            }
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('lowDohChart').getContext('2d');
+            const groups = data.reduce((acc, curr) => {
+                if (!acc[curr.name]) acc[curr.name] = { sum: 0, count: 0 };
+                acc[curr.name].sum += curr.doh;
+                acc[curr.name].count += 1;
+                return acc;
+            }, {});
+
+            const sortedArr = Object.keys(groups).map(name => ({
+                name,
+                avg: groups[name].sum / groups[name].count
+            })).sort((a,b) => a.avg - b.avg).slice(0, 10);
+
+            if (lowDohChart) lowDohChart.destroy();
+            lowDohChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedArr.map(i => i.name),
+                    datasets: [{
+                        data: sortedArr.map(i => i.avg.toFixed(1)),
+                        backgroundColor: sortedArr.map(i => i.avg < 7 ? '#ef4444' : (i.avg <= 14 ? '#f97316' : '#10b981')),
+                        borderRadius: 12,
+                        barThickness: 30
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { borderDash: [5, 5] }, title: { display: true, text: 'Avg. Days on Hand' } },
+                        y: { ticks: { font: { family: 'Sarabun', weight: 'bold' } }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderAlertTables(critical, warning) {
+            const critBody = document.getElementById('critical-table-body');
+            const warnBody = document.getElementById('warning-table-body');
+            
+            document.getElementById('count-critical').innerText = critical.length;
+            document.getElementById('count-warning').innerText = warning.length;
+
+            const createRows = (items, color) => {
+                if (!items.length) return `<tr><td colspan="4" class="p-10 text-center text-slate-300">ไม่มีรายการ</td></tr>`;
+                return items.sort((a,b)=>a.doh-b.doh).map(i => `
+                    <tr class="hover:bg-slate-50 transition-all">
+                        <td class="px-6 py-4">
+                            <div class="text-slate-800">${i.name}</div>
+                            <div class="text-[9px] text-slate-400 font-bold uppercase">${i.packing}</div>
+                        </td>
+                        <td class="px-4 py-4 text-slate-500">${i.factory}</td>
+                        <td class="px-4 py-4 text-right text-slate-700 font-bold">${i.stock.toLocaleString()}</td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-${color}-600 font-black">${i.doh.toFixed(1)}</span>
+                        </td>
+                    </tr>
+                `).join('');
+            };
+
+            critBody.innerHTML = createRows(critical, 'red');
+            warnBody.innerHTML = createRows(warning, 'orange');
+        }
+
+        function renderTable(data) {
+            const body = document.getElementById('table-body');
+            body.innerHTML = '';
+            data.sort((a,b) => a.doh - b.doh).forEach(item => {
+                let suggest = 0, action = "Normal Stock", actionClass = "text-slate-400";
+                if (item.doh < 21) {
+                    suggest = Math.max((30 * item.usage) - item.stock, 0);
+                    action = item.doh < 7 ? "URGENT REPLENISH" : "PLAN ORDER";
+                    actionClass = item.doh < 7 ? "text-red-600 font-black" : "text-orange-600 font-black";
+                }
+                body.innerHTML += `
+                    <tr class="hover:bg-slate-50 border-b border-slate-50 transition-all">
+                        <td class="px-8 py-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-2 rounded-full ${item.doh < 7 ? 'bg-red-500' : (item.doh <= 14 ? 'bg-orange-500' : 'bg-emerald-500')}"></div>
+                                <span class="font-black text-slate-800">${item.factory}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-6">
+                            <div class="font-black text-slate-700">${item.name}</div>
+                            <div class="flex gap-2 mt-1">
+                                <span class="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold uppercase">${item.packing}</span>
+                                <span class="text-[9px] bg-blue-50 px-1.5 py-0.5 rounded text-blue-600 font-bold uppercase">${item.vendor}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-6 text-right font-bold text-slate-800">${item.stock.toLocaleString()}</td>
+                        <td class="px-6 py-6 text-right font-bold text-slate-400">${item.usage.toLocaleString()}</td>
+                        <td class="px-6 py-6 text-center">
+                            <span class="px-3 py-1 rounded-full text-[10px] font-black ${item.doh < 7 ? 'bg-red-100 text-red-600' : (item.doh <= 14 ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600')}">
+                                ${item.doh.toFixed(1)} Days
+                            </span>
+                        </td>
+                        <td class="px-6 py-6 text-right bg-blue-50/30 font-black text-blue-700 text-lg">${suggest > 0 ? Math.round(suggest).toLocaleString() : '-'}</td>
+                        <td class="px-8 py-6 bg-blue-50/30 text-[10px] uppercase tracking-wider ${actionClass}">${action}</td>
+                    </tr>`;
+            });
+        }
+
+        window.onload = () => { populateUIElements(); updateUI(); };
+    </script>
+</body>
+</html>
