@@ -1,0 +1,571 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Package, 
+  ChevronRight, 
+  ChevronDown,
+  ArrowRightLeft,
+  Sparkles,
+  Info,
+  Clock,
+  TrendingUp,
+  Ship,
+  Truck,
+  Calendar,
+  Settings2,
+  Lock,
+  AlertCircle,
+  Scale,
+  X,
+  Save,
+  Database,
+  Layers,
+  ShoppingBag,
+  Timer,
+  Plus,
+  Trash2,
+  ListPlus
+} from 'lucide-react';
+
+const StockAllocation = () => {
+  const [expandedItems, setExpandedItems] = useState({});
+  const [allocations, setAllocations] = useState({}); 
+  const [transfers, setTransfers] = useState({}); 
+  const [viewUnit, setViewUnit] = useState('AUTO'); 
+  const [isMasterOpen, setIsMasterOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [newConstraintLabel, setNewConstraintLabel] = useState('');
+
+  const [inventory, setInventory] = useState([
+    {
+      id: 1,
+      name: "Axtra Prime",
+      type: "Import",
+      supplier: "Danisco Animal Nutrition",
+      totalAvgUsage: 0.707, 
+      totalSoh: 40.0, 
+      uom: "MT",
+      prefUnit: "KG", 
+      safetyStock: 30,
+      constraints: {
+        packSize: 0.025, 
+        palletSize: 1.0,
+        minAlloc: 0.5,
+        leadTime: 45,
+      },
+      factories: [
+        { id: 'bn', name: "Bangna", usage: 0.15, soh: 5 },
+        { id: 'hy', name: "Hadyai", usage: 0.12, soh: 10 },
+        { id: 'kb', name: "Kabinburi", usage: 0.18, soh: 10 },
+        { id: 'kk', name: "Khonkhen", usage: 0.10, soh: 5 },
+        { id: 'tr', name: "Tarua", usage: 0.157, soh: 10 },
+      ],
+      pendingOrders: [
+        { po: "PO-AX-001", qty: 150, invoice: "INV2024-001", eta: "2024-02-10", status: "On Vessel", transport: "Ship" },
+        { po: "PO-AX-005", qty: 200, invoice: "INV2024-015", eta: "2024-02-28", status: "Production", transport: "Ship" }
+      ]
+    },
+    {
+      id: 2,
+      name: "Enviva Pro 202",
+      type: "Import",
+      supplier: "IFF Health & Biosciences",
+      totalAvgUsage: 1.5, 
+      totalSoh: 8.0, 
+      uom: "MT",
+      prefUnit: "MT", 
+      safetyStock: 21,
+      constraints: {
+        packSize: 0.030, 
+        palletSize: 1.2,
+        minAlloc: 1.0,
+        leadTime: 30,
+      },
+      factories: [
+        { id: 'bn', name: "Bangna", usage: 0.5, soh: 2 },
+        { id: 'kj', name: "Koraj", usage: 0.6, soh: 4 },
+        { id: 'sk', name: "Sisaket", usage: 0.4, soh: 2 },
+      ],
+      pendingOrders: [
+        { po: "PO-EN-099", qty: 400, invoice: "TX-99881", eta: "2024-01-30", status: "Dispatched", transport: "Truck" }
+      ]
+    }
+  ]);
+
+  const stockDate = "21 Jan 2026";
+
+  const formatValue = (valMT, item) => {
+    const targetUnit = viewUnit === 'AUTO' ? item.prefUnit : viewUnit;
+    if (targetUnit === 'KG') {
+      return {
+        val: (valMT * 1000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+        unit: 'kg'
+      };
+    }
+    return {
+      val: valMT.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }),
+      unit: 'MT'
+    };
+  };
+
+  const calculateMultiSuggestion = (item, currentTransfers = {}) => {
+    const totalIncomingQty = item.pendingOrders.reduce((sum, p) => sum + p.qty, 0);
+    const getEffectiveSoh = (f) => f.soh + (currentTransfers[f.id] || 0);
+    const totalEffectiveSoh = item.factories.reduce((sum, f) => sum + getEffectiveSoh(f), 0);
+    const targetDays = (totalEffectiveSoh + totalIncomingQty) / item.totalAvgUsage;
+    
+    let currentAllocations = {};
+    item.factories.forEach(f => {
+      currentAllocations[f.id] = {};
+      item.pendingOrders.forEach(p => { currentAllocations[f.id][p.po] = 0; });
+    });
+
+    let remainingPOs = item.pendingOrders.map(p => ({ ...p, remaining: p.qty }));
+    const packSize = item.constraints?.packSize || 0.001;
+
+    item.factories.forEach(factory => {
+      let neededRaw = Math.max(0, targetDays * factory.usage - getEffectiveSoh(factory));
+      let needed = Math.ceil(neededRaw / packSize) * packSize;
+
+      for (let po of remainingPOs) {
+        if (needed <= 0) break;
+        let take = Math.min(needed, po.remaining);
+        take = Math.floor(take / packSize) * packSize;
+        if (take === 0 && po.remaining >= packSize && needed >= packSize) take = packSize;
+
+        currentAllocations[factory.id][po.po] = parseFloat(take.toFixed(4));
+        po.remaining -= take;
+        needed -= take;
+      }
+    });
+
+    return currentAllocations;
+  };
+
+  const handleTransferChange = (itemId, factoryId, value) => {
+    const val = parseFloat(value) || 0;
+    const newTransfersForItem = { ...(transfers[itemId] || {}), [factoryId]: val };
+    setTransfers(prev => ({ ...prev, [itemId]: newTransfersForItem }));
+
+    const item = inventory.find(i => i.id === itemId);
+    if (item) {
+      setAllocations(prev => ({
+        ...prev,
+        [itemId]: calculateMultiSuggestion(item, newTransfersForItem)
+      }));
+    }
+  };
+
+  const toggleExpand = (item) => {
+    const isExpanding = !expandedItems[item.id];
+    setExpandedItems(prev => ({ ...prev, [item.id]: isExpanding }));
+    if (isExpanding && !allocations[item.id]) {
+      setAllocations(prev => ({ ...prev, [item.id]: calculateMultiSuggestion(item, transfers[item.id]) }));
+      if (!transfers[item.id]) setTransfers(prev => ({ ...prev, [item.id]: {} }));
+    }
+  };
+
+  const handleAllocationChange = (itemId, factoryId, poNumber, value) => {
+    const val = parseFloat(value) || 0;
+    setAllocations(prev => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], [factoryId]: { ...(prev[itemId]?.[factoryId] || {}), [poNumber]: val } }
+    }));
+  };
+
+  const openMasterEdit = (item) => {
+    setEditingItem(JSON.parse(JSON.stringify(item))); // Deep copy
+    setIsMasterOpen(true);
+  };
+
+  const saveMasterData = () => {
+    setInventory(prev => prev.map(i => i.id === editingItem.id ? editingItem : i));
+    if (expandedItems[editingItem.id]) {
+      setAllocations(prev => ({
+        ...prev,
+        [editingItem.id]: calculateMultiSuggestion(editingItem, transfers[editingItem.id])
+      }));
+    }
+    setIsMasterOpen(false);
+    setEditingItem(null);
+  };
+
+  const addCustomConstraint = () => {
+    if (!newConstraintLabel.trim()) return;
+    const key = newConstraintLabel.toLowerCase().replace(/\s+/g, '_');
+    setEditingItem({
+      ...editingItem,
+      constraints: {
+        ...editingItem.constraints,
+        [key]: 0
+      }
+    });
+    setNewConstraintLabel('');
+  };
+
+  const removeConstraint = (key) => {
+    const newConstraints = { ...editingItem.constraints };
+    delete newConstraints[key];
+    setEditingItem({ ...editingItem, constraints: newConstraints });
+  };
+
+  const updateConstraintValue = (key, value) => {
+    setEditingItem({
+      ...editingItem,
+      constraints: {
+        ...editingItem.constraints,
+        [key]: parseFloat(value) || 0
+      }
+    });
+  };
+
+  const calculateCoverage = (stock, usage) => usage > 0 ? (stock / usage).toFixed(1) : 0;
+  
+  const getRunOutDate = (days) => {
+    if (isNaN(days) || days <= 0 || !isFinite(days)) return "Out of stock";
+    const date = new Date();
+    date.setDate(date.getDate() + Math.floor(parseFloat(days)));
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+  };
+
+  const getStatusColor = (days, safetyStock) => {
+    const d = parseFloat(days);
+    if (d < 7) return "text-red-600 bg-red-50 border-red-200"; 
+    if (d < safetyStock) return "text-amber-600 bg-amber-50 border-amber-200"; 
+    return "text-emerald-600 bg-emerald-50 border-emerald-200"; 
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50 font-sans text-slate-800 overflow-hidden text-[12px]">
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-lg font-extrabold text-slate-800 tracking-tight underline decoration-blue-500 decoration-2">Supply Chain Planner AI</h1>
+              <p className="text-[11px] text-slate-500 font-medium">Multi-Unit Allocation System</p>
+            </div>
+            <div className="h-8 w-px bg-gray-200 mx-2 hidden md:block"></div>
+            <div className="hidden md:flex flex-col">
+              <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider leading-none">Stock Date</span>
+              <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5 leading-none mt-1">
+                <Calendar className="w-3.5 h-3.5 text-blue-500" /> {stockDate}
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+             <div className="bg-slate-100 p-1 rounded-lg flex items-center gap-1 border border-slate-200">
+                {['AUTO', 'MT', 'KG'].map(u => (
+                  <button 
+                    key={u}
+                    onClick={() => setViewUnit(u)}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${viewUnit === u ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    {u}
+                  </button>
+                ))}
+             </div>
+             <button className="ml-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-md flex items-center gap-2 hover:bg-blue-700 active:scale-95 transition-all">
+                <Package className="w-3.5 h-3.5"/> Confirm Plan
+             </button>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-auto p-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-bold sticky top-0 z-10 border-b border-gray-200">
+                <tr>
+                  <th className="p-3 w-10"></th>
+                  <th className="p-3">Item Details</th>
+                  <th className="p-3 text-right">Stock</th>
+                  <th className="p-3 text-center">Avg Usage</th>
+                  <th className="p-3 text-center text-orange-600">Run-out Date</th>
+                  <th className="p-3 text-right text-blue-600">Total Incoming</th>
+                  <th className="p-3 text-center">DOH</th>
+                  <th className="p-3 text-center font-extrabold">Final End Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {inventory.map((item) => {
+                  const isExpanded = expandedItems[item.id];
+                  const totalIncoming = item.pendingOrders.reduce((a,b)=>a+b.qty, 0);
+                  const currentCoverage = calculateCoverage(item.totalSoh, item.totalAvgUsage);
+                  const totalCoverage = calculateCoverage(item.totalSoh + totalIncoming, item.totalAvgUsage);
+                  
+                  return (
+                    <React.Fragment key={item.id}>
+                      <tr 
+                        className={`hover:bg-gray-50 transition-all cursor-pointer border-l-4 ${isExpanded ? 'bg-slate-50 border-l-blue-500' : 'border-l-transparent'}`}
+                        onClick={() => toggleExpand(item)}
+                      >
+                        <td className="p-3 text-center">
+                          {isExpanded ? <ChevronDown className="w-4 h-4 text-blue-600"/> : <ChevronRight className="w-4 h-4 text-gray-400"/>}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-700">{item.name}</span>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); openMasterEdit(item); }}
+                              className="p-1 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded transition-all"
+                            >
+                              <Settings2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-slate-400 flex flex-wrap gap-1 mt-1">
+                             {/* แสดงเฉพาะ Pack Size ตามที่ขอ */}
+                             <span className="bg-slate-100 px-1 rounded border text-[9px]">P: {(item.constraints.packSize || 0) * 1000}kg</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right">
+                           <span className="font-mono font-bold text-slate-700">{formatValue(item.totalSoh, item).val}</span>
+                           <span className="text-[9px] text-slate-400 ml-1 uppercase">{formatValue(item.totalSoh, item).unit}</span>
+                        </td>
+                        <td className="p-3 text-center">
+                           {formatValue(item.totalAvgUsage, item).val}
+                        </td>
+                        <td className="p-3 text-center text-orange-600">
+                           {getRunOutDate(currentCoverage)}
+                        </td>
+                        <td className="p-3 text-right text-blue-600 font-bold">
+                           {formatValue(totalIncoming, item).val}
+                        </td>
+                        <td className="p-3 text-center">
+                           <span className={`px-2 py-0.5 rounded border font-bold text-[10px] ${getStatusColor(currentCoverage, item.safetyStock)}`}>
+                             {currentCoverage} d
+                           </span>
+                        </td>
+                        <td className="p-3 text-center font-bold text-slate-700">
+                           {getRunOutDate(totalCoverage)}
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr className="bg-slate-50/50">
+                          <td colSpan="8" className="p-4">
+                             <div className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                                <div className="bg-slate-900 text-white px-4 py-2 flex justify-between items-center">
+                                   <div className="flex items-center gap-2">
+                                      <Sparkles className="w-3.5 h-3.5 text-blue-300" />
+                                      <h3 className="text-[10px] font-bold uppercase tracking-wider">AI Suggestion - Factory Allocation</h3>
+                                   </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-[11px]">
+                                    <thead className="bg-slate-50 border-b">
+                                      <tr>
+                                        <th className="p-2 text-left">Factory</th>
+                                        <th className="p-2 text-center text-slate-500 font-medium">Avg Usage</th>
+                                        <th className="p-2 text-right">Current Soh</th>
+                                        <th className="p-2 text-center bg-orange-50/50 w-24">Adj / Transfer</th>
+                                        {item.pendingOrders.map(po => <th key={po.po} className="p-2 text-center bg-blue-50/30 min-w-[80px]">{po.po}</th>)}
+                                        <th className="p-2 text-center font-bold bg-slate-100 min-w-[120px]">Final Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {item.factories.map(factory => {
+                                        const factoryAlloc = allocations[item.id]?.[factory.id] || {};
+                                        const factoryTransfer = transfers[item.id]?.[factory.id] || 0;
+                                        let runningCumulativeStock = factory.soh + factoryTransfer;
+                                        
+                                        return (
+                                          <tr key={factory.id} className="border-b last:border-0 hover:bg-slate-50">
+                                            <td className="p-2 font-bold">{factory.name}</td>
+                                            <td className="p-2 text-center text-slate-400 font-mono italic">{formatValue(factory.usage, item).val}</td>
+                                            <td className="p-2 text-right text-slate-400 font-mono italic">{formatValue(factory.soh, item).val}</td>
+                                            <td className="p-1 bg-orange-50/20">
+                                              <input 
+                                                type="number"
+                                                className="w-full text-center bg-white border rounded p-1 font-bold focus:ring-1 focus:ring-orange-400 outline-none"
+                                                value={factoryTransfer}
+                                                onChange={(e) => handleTransferChange(item.id, factory.id, e.target.value)}
+                                              />
+                                            </td>
+                                            {item.pendingOrders.map(po => {
+                                              const qty = factoryAlloc[po.po] || 0;
+                                              runningCumulativeStock += qty;
+                                              // คำนวณความครอบคลุมสะสมสำหรับ PO นี้
+                                              const currentPoCoverage = calculateCoverage(runningCumulativeStock, factory.usage);
+                                              
+                                              return (
+                                                <td key={po.po} className="p-1 bg-blue-50/10">
+                                                  <div className="flex flex-col gap-1 p-0.5">
+                                                    <input 
+                                                      type="number"
+                                                      className="w-full text-center bg-white border rounded p-1 text-blue-600 font-bold focus:ring-1 focus:ring-blue-400 outline-none"
+                                                      value={qty}
+                                                      onChange={(e) => handleAllocationChange(item.id, factory.id, po.po, e.target.value)}
+                                                    />
+                                                    {/* แสดง End Date แต่ละ Column ตามที่ต้องการ */}
+                                                    <div className="text-[8px] text-center text-slate-400 font-bold bg-blue-100/30 rounded py-0.5 px-1 whitespace-nowrap overflow-hidden">
+                                                      End: {getRunOutDate(currentPoCoverage)}
+                                                    </div>
+                                                  </div>
+                                                </td>
+                                              );
+                                            })}
+                                            <td className="p-2 bg-slate-100/30">
+                                              <div className="flex flex-col items-center gap-0.5">
+                                                <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black ${getStatusColor(calculateCoverage(runningCumulativeStock, factory.usage), item.safetyStock)}`}>
+                                                  {calculateCoverage(runningCumulativeStock, factory.usage)} Days
+                                                </span>
+                                                <span className="text-[9px] text-slate-500 font-bold">
+                                                  {getRunOutDate(calculateCoverage(runningCumulativeStock, factory.usage))}
+                                                </span>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                             </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* DYNAMIC MASTER DATA MODAL */}
+      {isMasterOpen && editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-200 animate-in zoom-in duration-200">
+            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+               <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-blue-400" />
+                  <div>
+                    <h2 className="text-sm font-bold uppercase tracking-wide">Master Data & Custom Constraints</h2>
+                  </div>
+               </div>
+               <button onClick={() => setIsMasterOpen(false)} className="p-1 hover:bg-slate-800 rounded">
+                 <X className="w-5 h-5 text-slate-400" />
+               </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[75vh]">
+               <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 mb-6">
+                  <div className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-lg">
+                    {editingItem.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-800">{editingItem.name}</h3>
+                    <p className="text-[10px] text-slate-500">{editingItem.supplier}</p>
+                  </div>
+               </div>
+
+               <div className="space-y-6">
+                 {/* Standard Settings */}
+                 <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-1.5">
+                     <label className="text-[10px] font-extrabold text-slate-400 uppercase">Safety Stock (Days)</label>
+                     <input 
+                       type="number"
+                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none"
+                       value={editingItem.safetyStock}
+                       onChange={(e) => setEditingItem({ ...editingItem, safetyStock: parseInt(e.target.value) || 0 })}
+                     />
+                   </div>
+                   <div className="space-y-1.5">
+                     <label className="text-[10px] font-extrabold text-slate-400 uppercase">Pack Size (MT)</label>
+                     <input 
+                       type="number"
+                       step="0.001"
+                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none"
+                       value={editingItem.constraints.packSize}
+                       onChange={(e) => updateConstraintValue('packSize', e.target.value)}
+                     />
+                   </div>
+                 </div>
+
+                 {/* Dynamic Logistics Constraints */}
+                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
+                      <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                        <Truck className="w-3 h-3 text-blue-500" /> Logistics Constraints
+                      </h4>
+                    </div>
+
+                    <div className="space-y-3">
+                       {Object.entries(editingItem.constraints)
+                         .filter(([key]) => key !== 'packSize')
+                         .map(([key, value]) => (
+                         <div key={key} className="flex items-end gap-3 animate-in fade-in slide-in-from-left-2 duration-200">
+                            <div className="flex-1 space-y-1">
+                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tight ml-1">
+                                 {key.replace('_', ' ')}
+                               </label>
+                               <input 
+                                 type="number"
+                                 step="0.1"
+                                 className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-blue-500 outline-none"
+                                 value={value}
+                                 onChange={(e) => updateConstraintValue(key, e.target.value)}
+                               />
+                            </div>
+                            <button 
+                              onClick={() => removeConstraint(key)}
+                              className="mb-1 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title="Delete Constraint"
+                            >
+                               <Trash2 className="w-4 h-4" />
+                            </button>
+                         </div>
+                       ))}
+
+                       {/* Add New Constraint UI */}
+                       <div className="mt-4 pt-4 border-t border-slate-200 border-dashed">
+                          <div className="flex gap-2">
+                             <div className="relative flex-1">
+                                <ListPlus className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                <input 
+                                  type="text"
+                                  placeholder="Constraint Name (e.g. MOE, Max Capacity)"
+                                  className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-[11px] focus:ring-1 focus:ring-blue-500 outline-none"
+                                  value={newConstraintLabel}
+                                  onChange={(e) => setNewConstraintLabel(e.target.value)}
+                                  onKeyPress={(e) => e.key === 'Enter' && addCustomConstraint()}
+                                />
+                             </div>
+                             <button 
+                               onClick={addCustomConstraint}
+                               disabled={!newConstraintLabel.trim()}
+                               className="px-4 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-bold hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 transition-all"
+                             >
+                               <Plus className="w-3 h-3" /> Add Field
+                             </button>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+               </div>
+
+               <div className="mt-6 bg-amber-50 p-3 rounded-lg border border-amber-100 flex gap-3">
+                  <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-amber-700 leading-relaxed italic">
+                    คุณสามารถ <b>เพิ่มหัวข้อ Logistics ใหม่ๆ</b> ได้เอง เช่น MOQ, Pallet Size หรือ Lead Time โดยพิมพ์ชื่อหัวข้อในช่องด้านบนและกด Add Field
+                  </p>
+               </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3">
+               <button onClick={() => setIsMasterOpen(false)} className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-100 transition-all">
+                 Cancel
+               </button>
+               <button onClick={saveMasterData} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                 <Save className="w-3.5 h-3.5" /> Save All Changes
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default StockAllocation;
