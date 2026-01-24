@@ -1,28 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  Package, 
-  ChevronRight, 
-  ChevronDown, 
-  ArrowRightLeft, 
-  Info, 
-  Clock, 
-  Ship, 
-  Truck, 
-  Calendar, 
-  X, 
-  ListPlus, 
-  LayoutGrid, 
-  List, 
-  Search, 
-  Filter, 
-  Factory, 
-  Store, 
-  FileCheck, 
-  FileClock, 
-  CalendarRange, 
-  Cpu,          
-  MousePointer2,
-  Lock
+  Package, ChevronRight, ChevronDown, ArrowRightLeft, Info, Clock, Ship, Truck, 
+  Calendar, X, ListPlus, LayoutGrid, List, Search, Filter, Factory, Store, 
+  FileCheck, FileClock, CalendarRange, Cpu, MousePointer2, Lock
 } from 'lucide-react';
 
 const App = () => {
@@ -71,42 +51,17 @@ const App = () => {
       ],
       pendingOrders: [
          { 
-          id: "ord-3a",
-          type: "INVOICE", 
-          docNo: "INV-BT-2024", 
-          refPO: "PO-BT-001",
-          qty: 24.0, 
-          planningQty: 24.0, 
-          eta: "2024-02-05", 
-          status: "Confirmed",
-          isScheduled: true, 
+          id: "ord-3a", type: "INVOICE", docNo: "INV-BT-2024", refPO: "PO-BT-001",
+          qty: 24.0, planningQty: 24.0, eta: "2024-02-05", status: "Confirmed", isScheduled: true, 
           allocations: { 'bn': 12.0, 'tr': 12.0 } 
         },
          { 
-          id: "ord-3c",
-          type: "SHIPMENT", 
-          docNo: "SH-BT-OPEN", 
-          refPO: "PO-BT-002",
-          qty: 15.0, 
-          planningQty: 15.0, 
-          eta: "2024-02-15", 
-          status: "Customs",
-          isScheduled: false 
+          id: "ord-3c", type: "SHIPMENT", docNo: "SH-BT-OPEN", refPO: "PO-BT-002",
+          qty: 15.0, planningQty: 15.0, eta: "2024-02-15", status: "Customs", isScheduled: false 
         },
          { 
-          id: "ord-3b",
-          type: "PO", 
-          isBlanket: true,
-          docNo: "PO-BT-LONG", 
-          refPO: "PO-BT-LONG",
-          totalQty: 300.0,
-          deliveredQty: 80.0,
-          balance: 205.0, 
-          planningQty: 50.0, 
-          eta: "TBD", 
-          estEta: "2024-03-XX", 
-          status: "Partial Call-off",
-          isScheduled: false 
+          id: "ord-3b", type: "PO", isBlanket: true, docNo: "PO-BT-LONG", refPO: "PO-BT-LONG",
+          totalQty: 300.0, deliveredQty: 80.0, balance: 205.0, planningQty: 50.0, eta: "TBD", estEta: "2024-03-XX", status: "Partial Call-off", isScheduled: false 
         }
       ]
     },
@@ -132,28 +87,13 @@ const App = () => {
       ],
       pendingOrders: [
         { 
-          id: "ord-1",
-          type: "INVOICE", 
-          docNo: "INV-2024-001", 
-          refPO: "PO-AX-001",
-          qty: 15.0, 
-          planningQty: 15.0,
-          eta: "2024-02-10",
-          status: "On Vessel",
-          isScheduled: true,
+          id: "ord-1", type: "INVOICE", docNo: "INV-2024-001", refPO: "PO-AX-001",
+          qty: 15.0, planningQty: 15.0, eta: "2024-02-10", status: "On Vessel", isScheduled: true,
           allocations: { 'bn': 5.0, 'tr': 5.0, 'kb': 5.0 }
         },
         { 
-          id: "ord-2",
-          type: "PO",
-          docNo: "PO-AX-005", 
-          refPO: "PO-AX-005",
-          qty: 20.0, 
-          planningQty: 20.0,
-          eta: "TBD",
-          estEta: "2024-02-28", 
-          status: "Production",
-          isScheduled: false
+          id: "ord-2", type: "PO", docNo: "PO-AX-005", refPO: "PO-AX-005",
+          qty: 20.0, planningQty: 20.0, eta: "TBD", estEta: "2024-02-28", status: "Production", isScheduled: false
         }
       ]
     },
@@ -179,14 +119,8 @@ const App = () => {
       ],
       pendingOrders: [
         { 
-          id: "ord-9", 
-          type: "PO", 
-          docNo: "PO-PZ-001", 
-          qty: 5.0, 
-          planningQty: 5.0, 
-          estEta: "2024-03-01", 
-          status: "Planned",
-          isScheduled: false 
+          id: "ord-9", type: "PO", docNo: "PO-PZ-001", 
+          qty: 5.0, planningQty: 5.0, estEta: "2024-03-01", status: "Planned", isScheduled: false 
         }
       ]
     }
@@ -199,23 +133,25 @@ const App = () => {
   const uniqueVendors = ['All', ...Array.from(new Set(inventory.map(i => i.supplier))).sort()];
 
   const filteredInventory = inventory.filter(item => {
-    const matchProduct = filterProduct === '' || 
-      item.name.toLowerCase().includes(filterProduct.toLowerCase()) ||
-      item.commonName.toLowerCase().includes(filterProduct.toLowerCase());
+    const matchProduct = filterProduct === '' || item.name.toLowerCase().includes(filterProduct.toLowerCase()) || item.commonName.toLowerCase().includes(filterProduct.toLowerCase());
     const matchVendor = filterVendor === 'All' || item.supplier === filterVendor;
     const matchFactory = filterFactory === 'All' || item.factories.some(f => f.name === filterFactory);
     return matchProduct && matchVendor && matchFactory;
   });
 
   const formatValue = (valMT) => {
-    const targetUnit = viewUnit; 
-    if (targetUnit === 'KG') {
-      return { val: (valMT * 1000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }), unit: 'kg' };
+    const num = parseFloat(valMT) || 0;
+    if (viewUnit === 'KG') {
+      return { val: (num * 1000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }), unit: 'kg' };
     }
-    return { val: valMT.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }), unit: 'MT' };
+    return { val: num.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }), unit: 'MT' };
   };
 
-  const calculateCoverage = (stock, usage) => usage > 0 ? (stock / usage).toFixed(1) : "0";
+  const calculateCoverage = (stock, usage) => {
+    const s = parseFloat(stock) || 0;
+    const u = parseFloat(usage) || 0;
+    return u > 0 ? (s / u).toFixed(1) : "0";
+  };
    
   const getRunOutDate = (days) => {
     const d = parseFloat(days);
@@ -263,16 +199,8 @@ const App = () => {
   };
 
   const clearActiveSource = (itemId) => {
-    setActiveSource(prev => {
-        const newState = {...prev};
-        delete newState[itemId];
-        return newState;
-    });
-    setActivePlanningQty(prev => {
-        const newState = {...prev};
-        delete newState[itemId];
-        return newState;
-    });
+    setActiveSource(prev => { const s = {...prev}; delete s[itemId]; return s; });
+    setActivePlanningQty(prev => { const s = {...prev}; delete s[itemId]; return s; });
   };
 
   const handleAIAllocate = (item, orderId) => {
@@ -287,7 +215,6 @@ const App = () => {
         const allocatedAmount = (quantityToAllocate * ratio).toFixed(3);
         handleAllocationChange(item.id, factory.id, orderId, allocatedAmount);
         
-        // Auto-Set Date
         const suggestedDate = calculateNeedByDate(factory);
         const dateKey = `${orderId}_${factory.id}`;
         setDeliveryDates(prev => ({...prev, [dateKey]: suggestedDate}));
@@ -303,10 +230,7 @@ const App = () => {
   };
 
   const handleDateChange = (poId, factoryId, date) => {
-     setDeliveryDates(prev => ({
-       ...prev,
-       [`${poId}_${factoryId}`]: date
-     }));
+     setDeliveryDates(prev => ({ ...prev, [`${poId}_${factoryId}`]: date }));
   };
 
   const getScheduledDate = (poId, factoryId) => {
@@ -369,15 +293,8 @@ const App = () => {
             {filteredInventory.map((item) => {
               const isExpanded = expandedItems[item.id];
               
-              // 1. Scheduled
-              const totalScheduled = item.pendingOrders
-                .filter(o => o.isScheduled)
-                .reduce((acc, ord) => acc + ord.planningQty, 0); 
-              
-              // 2. Open PO Balance
-              const totalOpen = item.pendingOrders
-                .filter(o => !o.isScheduled)
-                .reduce((acc, ord) => acc + (ord.isBlanket ? ord.balance : ord.qty), 0);
+              const totalScheduled = item.pendingOrders.filter(o => o.isScheduled).reduce((acc, ord) => acc + (parseFloat(ord.planningQty) || 0), 0); 
+              const totalOpen = item.pendingOrders.filter(o => !o.isScheduled).reduce((acc, ord) => acc + (ord.isBlanket ? (parseFloat(ord.balance) || 0) : (parseFloat(ord.qty) || 0)), 0);
 
               const currentCoverage = calculateCoverage(item.totalSoh, item.totalAvgUsage);
               const potentialCoverage = calculateCoverage(item.totalSoh + totalScheduled + totalOpen, item.totalAvgUsage);
@@ -385,7 +302,6 @@ const App = () => {
               const activeOrderId = activeSource[item.id];
               const activeOrder = item.pendingOrders.find(o => o.id === activeOrderId);
               
-              // For Confirmed Inbound Header
               const scheduledPOs = item.pendingOrders.filter(o => o.isScheduled);
               const mainScheduledPO = scheduledPOs.length > 0 ? scheduledPOs[0] : null;
 
@@ -400,26 +316,16 @@ const App = () => {
                     <td className="p-3 text-right font-mono font-bold">{formatValue(item.totalSoh).val}</td>
                     <td className="p-3 text-center font-mono">{formatValue(item.totalAvgUsage).val}</td>
                     <td className="p-3 text-center text-orange-600 font-medium">{getRunOutDate(currentCoverage)}</td>
-                    
-                    {/* Scheduled Column */}
                     <td className="p-3 text-right font-mono text-blue-600 font-bold bg-blue-50/30 border-l border-blue-100">
                         {totalScheduled > 0 ? (
-                           <div className="flex items-center justify-end gap-1">
-                                <Truck className="w-3 h-3"/> {formatValue(totalScheduled).val}
-                           </div>
+                           <div className="flex items-center justify-end gap-1"><Truck className="w-3 h-3"/> {formatValue(totalScheduled).val}</div>
                         ) : <span className="text-slate-300">-</span>}
                     </td>
-
-                    {/* Open PO Column */}
                     <td className="p-3 text-right font-mono text-purple-600 font-medium bg-purple-50/30 border-l border-purple-100">
                         {totalOpen > 0 ? (
-                            <div className="flex flex-col items-end">
-                                <span>{formatValue(totalOpen).val}</span>
-                                <span className="text-[8px] opacity-60 font-normal">Shipment & Bal.</span>
-                            </div>
+                            <div className="flex flex-col items-end"><span>{formatValue(totalOpen).val}</span><span className="text-[8px] opacity-60 font-normal">Shipment & Bal.</span></div>
                         ) : <span className="text-slate-300">-</span>}
                     </td>
-
                     <td className="p-3 text-center">
                         {activeOrder ? (
                             <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold text-[9px] border border-purple-200">Allocating...</span>
@@ -435,10 +341,7 @@ const App = () => {
                       <td colSpan="9" className="p-4">
                           <div className="bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
                             <div className="bg-slate-900 text-white px-4 py-2 flex justify-between items-center">
-                                <h3 className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2">
-                                    Factory Allocation Breakdown
-                                    {activeOrder && <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-[9px] flex items-center gap-1"><ArrowRightLeft className="w-3 h-3"/> Source: {activeOrder.docNo}</span>}
-                                </h3>
+                                <h3 className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2">Factory Allocation Breakdown {activeOrder && <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-[9px] flex items-center gap-1"><ArrowRightLeft className="w-3 h-3"/> Source: {activeOrder.docNo}</span>}</h3>
                                 <div className="flex gap-2">
                                     {!activeOrder ? (
                                         <button onClick={(e) => { e.stopPropagation(); setShowSourceModal(item); }} className="flex items-center gap-1 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-[10px] font-bold transition-all animate-pulse shadow-blue-500/50 shadow-lg">
@@ -525,13 +428,9 @@ const App = () => {
                                   const transfer = transfers[item.id]?.[factory.id] || 0;
                                   const confirmedInbound = getFactoryConfirmedInboundTotal(item, factory.id);
                                   
-                                  // --- Stock End Date ---
                                   const stockReach = calculateCoverage(factory.soh, factory.usage);
-
-                                  // --- Confirmed End Date (Cumulative) ---
                                   const confirmedReach = calculateCoverage(factory.soh + confirmedInbound, factory.usage);
 
-                                  // --- Allocation End Date (Cumulative) ---
                                   let runningStock = factory.soh + confirmedInbound + transfer;
                                   let allocatedQty = 0;
                                   if (activeOrder) {
@@ -545,7 +444,6 @@ const App = () => {
                                     <tr key={factory.id} className="border-b last:border-0 hover:bg-slate-50">
                                       <td className="p-2 font-bold text-slate-700 border-r">{factory.name}</td>
                                       
-                                      {/* Stock + End Date */}
                                       <td className="p-2 text-right text-slate-800 font-bold border-r bg-slate-50">
                                           {formatValue(factory.soh).val}
                                           <div className="text-[8px] text-slate-400 font-medium mt-0.5 whitespace-nowrap">End: {getRunOutDate(stockReach)}</div>
@@ -554,7 +452,6 @@ const App = () => {
                                       <td className="p-2 text-right text-slate-400 border-r">{formatValue(factory.usage).val}</td>
                                       <td className="p-1 bg-orange-50/10 border-r"><input type="number" className="w-full text-center bg-white border border-orange-200 rounded p-1 font-bold text-orange-600 outline-none" value={transfer} onChange={(e) => handleTransferChange(item.id, factory.id, e.target.value)} /></td>
                                       
-                                      {/* Confirmed + End Date */}
                                       <td className="p-2 text-center font-bold text-blue-600 bg-blue-50/30 border-r border-blue-100">
                                         {confirmedInbound > 0 ? (
                                             <>
@@ -564,7 +461,6 @@ const App = () => {
                                         ) : <span className="text-slate-300">-</span>}
                                       </td>
                                       
-                                      {/* Allocation + End Date */}
                                       <td className={`p-1.5 border-r ${activeOrder ? 'bg-purple-50/30' : 'bg-slate-50'}`}>
                                          {activeOrder ? (
                                             <div className="flex flex-col gap-1">
@@ -601,7 +497,6 @@ const App = () => {
         </table>
       </div>
 
-      {/* --- INBOUND DETAILS MODAL --- */}
       {inboundDetail && (
          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/20 backdrop-blur-[1px] p-4 animate-in fade-in">
              <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
@@ -641,7 +536,6 @@ const App = () => {
          </div>
       )}
 
-      {/* --- SOURCE SELECTION MODAL --- */}
       {showSourceModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] p-4 animate-in fade-in">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
@@ -726,7 +620,6 @@ const App = () => {
                               }
                               const dateKey = `${schedulingData.po.id}_${f.id}`;
                               
-                              // For fixed scheduled items, get the date from data
                               const fixedDate = schedulingData.po.eta; 
 
                               if ((!qty || parseFloat(qty) <= 0) && schedulingData.po.isScheduled) return null;
